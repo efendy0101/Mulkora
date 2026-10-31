@@ -1,4 +1,4 @@
-import * as admin from "firebase-admin";
+import * as admin from "./firebaseAdmin";
 
 // Firebase Admin başlat
 admin.initializeApp();

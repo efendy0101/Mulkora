@@ -1,5 +1,5 @@
-import * as admin from "firebase-admin";
-import * as functions from "firebase-functions";
+import * as admin from "../firebaseAdmin";
+import * as functions from "firebase-functions/v1";
 
 const db = admin.firestore();
 
@@ -53,7 +53,7 @@ export const onUserCreated = functions
     };
 
     try {
-      await db.collection("users").doc(uid).set(userDoc);
+      await db.collection("users").doc(uid).create(userDoc);
       functions.logger.info(`Kullanıcı profili oluşturuldu: ${uid}`);
     } catch (error) {
       functions.logger.error(`Kullanıcı profili oluşturulamadı: ${uid}`, error);

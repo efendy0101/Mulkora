@@ -33,7 +33,7 @@
 
 | Yazılım | Sürüm | İndirme |
 |---------|-------|---------|
-| Node.js | 20 LTS+ | https://nodejs.org |
+| Node.js | 22 (Cloud Functions), 24.12+ (testler) | https://nodejs.org |
 | Firebase CLI | 13+ | `npm install -g firebase-tools` |
 | Android Studio | 2024.1+ | https://developer.android.com/studio |
 | Java (JDK) | 17+ | https://www.oracle.com/java |

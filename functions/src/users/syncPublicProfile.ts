@@ -1,5 +1,5 @@
-import * as admin from "firebase-admin";
-import * as functions from "firebase-functions";
+import * as admin from "../firebaseAdmin";
+import * as functions from "firebase-functions/v1";
 export function publicProfile(uid: string, data: FirebaseFirestore.DocumentData) {
   const fields = ["username", "displayName", "photoUrl", "avatarUrl", "bio", "city", "role", "links", "postCount", "referenceCount", "averageReferenceRating", "ratingCount", "createdAt", "updatedAt"];
   const result: FirebaseFirestore.DocumentData = { uid };

@@ -1,5 +1,5 @@
-import * as admin from "firebase-admin";
-import * as functions from "firebase-functions";
+import * as admin from "../firebaseAdmin";
+import * as functions from "firebase-functions/v1";
 // pdfkit CJS modülü için TypeScript CJS import sözdizimi
 import PDFDocument = require("pdfkit");
 import * as crypto from "crypto";

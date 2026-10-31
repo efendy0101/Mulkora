@@ -1,5 +1,5 @@
 // This script always targets the local Firebase emulators and a demo project.
-const admin = require('../functions/node_modules/firebase-admin');
+const admin = require('../functions/lib/firebaseAdmin');
 process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 const projectId = 'demo-mulkora';
@@ -23,6 +23,8 @@ async function createUser(uid, email, displayName, role) {
     uid, email, displayName, username: uid.replace(/-/g, '_'), role,
     city: 'İzmir', isBanned: false, isBlocked: false, createdAt: timestamp, updatedAt: timestamp,
   });
+  // Keep the local demo admin role in sync with its emulator-only claim.
+  if (role === 'admin') await db.collection('users').doc(uid).set({ role: 'admin' }, { merge: true });
 }
 async function main() {
   await createUser('demo-admin', 'admin@example.com', 'Demo Yönetici', 'admin');

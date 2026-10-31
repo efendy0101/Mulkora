@@ -13,7 +13,7 @@ Mülkora, kiracı ve ev sahiplerinin deneyimlerini paylaşması için geliştiri
 
 ## Gereksinimler
 
-- Node.js 20 ve npm; Firebase CLI (`npm install -g firebase-tools`)
+- Node.js 22 (Cloud Functions), Node.js 24.12 veya üzeri (testler) ve npm; Firebase CLI (`npm install -g firebase-tools`)
 - Firebase Emulator Suite için Java; Android derlemesi için Android Studio, Android SDK ve JDK 17
 - Android uygulaması için kendi Firebase projenize ait `google-services.json`
 
@@ -24,6 +24,7 @@ Demo yalnızca `demo-mulkora` adlı yerel Firebase emülatör projesinde çalı�
 ```powershell
 cd functions
 npm ci
+npm run build
 cd ..
 firebase emulators:start --project demo-mulkora --only auth,firestore,functions
 ```
@@ -34,7 +35,7 @@ Emülatörler hazır olduğunda ikinci terminalde depo kökünden örnek veriler
 node scripts/seed-demo.cjs
 ```
 
-Komut iki örnek kullanıcı, bir demo yönetici, kategoriler, iki yayımlanmış gönderi ve bir onay bekleyen gönderi oluşturur. Var olan demo kayıtlarını silmez veya üzerine yazmaz; sıfırlamak için emülatörü yeni ve boş bir oturumla başlatın. Hesaplar ve içerikler tamamen örnektir.
+Komut iki örnek kullanıcı, bir demo yönetici, kategoriler, iki yayımlanmış gönderi ve bir onay bekleyen gönderi oluşturur. Mevcut demo kayıtlarını silmez; demo yöneticisinin rolünü her çalıştırmada yeniden admin yapar; sıfırlamak için emülatörü yeni ve boş bir oturumla başlatın. Hesaplar ve içerikler tamamen örnektir.
 
 Üçüncü terminalde:
 

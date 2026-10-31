@@ -2,7 +2,7 @@
 
 ## Gereksinimler
 
-- Node.js 20+
+- Node.js 24.12+
 - Firebase CLI (`npm install -g firebase-tools`)
 - Firebase Emulator Suite
 

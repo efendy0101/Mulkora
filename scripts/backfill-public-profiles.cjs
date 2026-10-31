@@ -1,4 +1,4 @@
-const admin = require('../functions/node_modules/firebase-admin');
+const admin = require('../functions/lib/firebaseAdmin');
 const projectId = process.env.GCLOUD_PROJECT;
 if (!projectId || process.argv[2] !== '--confirm-project' || process.argv[3] !== projectId) {
   console.error('Set GCLOUD_PROJECT and pass --confirm-project <same project ID>.'); process.exit(1);

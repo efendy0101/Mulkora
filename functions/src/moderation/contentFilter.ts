@@ -248,7 +248,7 @@ export function analyzeContent(
 
 // ─── Async Wrapper (addComment / editComment uyumu) ─────────────────────────
 
-import * as admin from "firebase-admin";
+import * as admin from "../firebaseAdmin";
 import { loadBannedTerms } from "./bannedTermsLoader";
 
 export interface ContentFilterResult {
