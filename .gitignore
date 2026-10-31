@@ -1,0 +1,116 @@
+# Android
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Kotlin
+*.class
+*.jar
+*.war
+*.ear
+
+# Gradle
+.gradle/
+build/
+
+# Android Studio
+*.orig
+*.bak
+
+# Google Services (KESİNLİKLE GİT'E EKLENMEMELİ)
+# CLAUDE.md: google-services.json gizli tutulmalıdır.
+google-services.json
+GoogleService-Info.plist
+
+# Firebase Service Account (ASLA GİT'E EKLENMEMELİ)
+service-account.json
+*-service-account*.json
+*.serviceaccount.json
+
+# Keystore dosyaları (imzalama anahtarları)
+*.jks
+*.keystore
+release.keystore
+
+# Yerel yapılandırma (API anahtarları vs.)
+local.properties
+secrets.properties
+*.env
+.env
+.env.local
+.env.production
+
+# AdMob gerçek ID'leri (test ID'leri kodda kalabilir)
+admob.properties
+
+# Firebase emulator export
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Node.js (Cloud Functions)
+node_modules/
+functions/node_modules/
+functions/lib/
+
+# npm / yarn
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test çıktıları
+*.lcov
+coverage/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Sertifikalar
+*.pem
+*.cer
+*.der
+*.crt
+*.key
+*.pfx
+*.p12
+# Local tooling, build output and emulator data
+.kotlin/
+.artifacts/
+.next/
+out/
+*.log
+firebase-export*/
+tmp_write.js
+!gradle/wrapper/gradle-wrapper.jar

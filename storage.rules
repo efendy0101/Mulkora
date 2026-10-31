@@ -1,0 +1,73 @@
+rules_version = '2';
+
+// Mülkora — Firebase Storage Security Rules
+// CLAUDE.md Bölüm 15: Görsel Yükleme
+// CLAUDE.md Bölüm 26: Firebase Storage güvenliği
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ─── Yardımcı Fonksiyonlar ───────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.role == 'admin';
+    }
+
+    // Dosya boyutu kontrolü (5MB)
+    function isValidImageSize() {
+      return request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // MIME türü kontrolü (JPEG veya PNG)
+    function isValidImageType() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    // ─── Profil Fotoğrafları ─────────────────────────────────────────────────
+    // profile_photos/{uid}/avatar.jpg
+    match /profile_photos/{uid}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(uid) &&
+        isValidImageSize() &&
+        isValidImageType();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // ─── Gönderi Görselleri ──────────────────────────────────────────────────
+    // post_images/{uid}/{postId}.jpg
+    // CLAUDE.md: Her gönderiye en fazla bir görsel
+    match /post_images/{uid}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(uid) &&
+        isValidImageSize() &&
+        isValidImageType();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // ─── Sözleşme PDF'leri ───────────────────────────────────────────────────
+    // contracts/{contractId}/contract.pdf
+    // CLAUDE.md: Sözleşmenin tarafı olmayan kişi PDF dosyasına erişemez.
+    // Not: Sözleşme taraf doğrulaması Firestore üzerinden yapılır.
+    // Storage, Cloud Functions üzerinden oluşturulmuş token ile erişim sağlar.
+    match /contracts/{contractId}/{fileName} {
+      // Sadece storage token ile erişim (Cloud Functions tarafından oluşturulur)
+      allow read: if isAuthenticated() && isAdmin();
+      allow write: if false; // Yalnızca Cloud Functions üzerinden
+      allow delete: if isAdmin();
+    }
+
+    // ─── Tüm diğer yollar ───────────────────────────────────────────────────
+    // Tanımlanmamış yollara erişimi engelle
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

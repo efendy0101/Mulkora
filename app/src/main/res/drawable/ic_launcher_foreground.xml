@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Uygulama başlatıcı ikonu ön planı — Adaptive Icon ve Splash Screen için kullanılır.
+    Tasarım: ev silüeti, Mülkora marka rengi (#1976D2) arka plan üzerinde beyaz.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,24L20,54h8v30h20V68h12v16h20V54h8L54,24z
+                         M54,32l24,22v28H68V66H40v16H32V54L54,32z" />
+</vector>

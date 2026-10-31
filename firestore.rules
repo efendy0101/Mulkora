@@ -1,0 +1,378 @@
+rules_version = '2';
+
+// Mülkora — Firestore Security Rules
+// CLAUDE.md Bölüm 26: Firestore ve Storage Güvenliği
+// docs/15-security-rules-approach.md ile eşleşir.
+//
+// KURAL: Hiçbir istemci tarafı kodu bu kuralları atlayamaz.
+// Sayaçlar, roller ve onaylar yalnızca Cloud Functions üzerinden değiştirilebilir.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Yardımcı Fonksiyonlar ───────────────────────────────────────────────
+
+    // Kullanıcı giriş yapmış mı?
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Kullanıcı kendi kaynağına mı erişiyor?
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Kullanıcı moderatör veya admin mi? (Custom Claims)
+    function isModerator() {
+      return isAuthenticated() &&
+        (request.auth.token.role == 'moderator' || request.auth.token.role == 'admin');
+    }
+
+    // Kullanıcı admin mi?
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'admin';
+    }
+
+    // Kullanıcı engellenmemiş mi?
+    function isNotBanned() {
+      return isAuthenticated() && request.auth.token.get('banned', false) != true;
+    }
+
+    // Belirtilen alanlar değiştirilmemiş mi?
+    function notChanging(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Yalnızca sunucunun ürettiği, özel alan içermeyen profil.
+    match /publicProfiles/{uid} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // ─── users ───────────────────────────────────────────────────────────────
+    match /users/{uid} {
+
+      // Özel profil yalnızca sahibi ve yetkili personel tarafından okunabilir.
+      allow read: if isOwner(uid) || isModerator();
+      // Profil yalnızca güvenilir sunucu kodu tarafından oluşturulur.
+      allow create: if false;
+      allow update: if isOwner(uid) && isNotBanned() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName', 'bio', 'city', 'photoUrl', 'avatarUrl', 'links',
+          'fcmTokens', 'updatedAt', 'termsAcceptedAt', 'kvkkAcceptedAt', 'role'
+        ]) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) ||
+          (resource.data.role in ['tenant', 'landlord', 'both'] &&
+           request.resource.data.role in ['tenant', 'landlord', 'both']));
+
+      // Silme: yalnızca Cloud Functions deleteAccount üzerinden (veya admin)
+      allow delete: if isAdmin();
+
+      // Alt koleksiyon: bildirimler
+      // Oluşturma yalnızca Cloud Functions Admin SDK üzerinden yapılır (rules'u atlar).
+      // Kullanıcı kendi bildirimlerini okuyabilir, okundu işaretleyebilir ve silebilir.
+      // CLAUDE.md §16: Bildirimler uygulama içi bildirim merkezinde saklanmalıdır.
+      match /notifications/{notifId} {
+        allow read:   if isOwner(uid);
+        // İstemci create yapamaz — Cloud Functions onNotificationCreated üzerinden oluşturulur
+        allow create: if false;
+        // isRead → true güncellemesi ve silme kullanıcıya açıktır
+        allow update: if isOwner(uid) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'updatedAt']);
+        allow delete: if isOwner(uid);
+      }
+
+      // Alt koleksiyon: bildirim tercihleri
+      // Kullanıcı kendi bildirim tercihlerini okuyup güncelleyebilir.
+      match /notificationPreferences/{prefId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid);
+        allow update: if isOwner(uid);
+        allow delete: if false;
+      }
+
+      // Alt koleksiyon: kaydedilen gönderiler
+      // PostDetailRepositoryImpl.toggleSavePost() istemciden doğrudan yazar.
+      // Kabul edilebilir: sadece bookmark işlemi, sayaç veya hassas alan içermez.
+      match /savedPosts/{postId} {
+        allow read:   if isOwner(uid);
+        allow create: if isOwner(uid) && isNotBanned();
+        allow delete: if isOwner(uid);
+        allow update: if false;
+      }
+    }
+
+    // ─── usernames ───────────────────────────────────────────────────────────
+    match /usernames/{username} {
+      // Kullanıcı adı rezervasyonu kontrol edilebilir
+      allow read: if isAuthenticated();
+      // Sadece Cloud Functions checkUsername/createUserProfile yazabilir
+      allow write: if false;
+    }
+
+    // ─── posts ───────────────────────────────────────────────────────────────
+    match /posts/{postId} {
+
+      // Yalnızca onaylı gönderiler okunabilir (genel kullanıcı)
+      // Moderatörler ve adminler tüm durumları okuyabilir
+      // Gönderi sahibi kendi gönderisini okuyabilir
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'approved' ||
+        isModerator() ||
+        isOwner(resource.data.authorUid)
+      );
+
+      // Oluşturma: sadece kimliği doğrulanmış, engellenmemiş kullanıcılar
+      // Durum doğrudan 'approved' olarak ayarlanamaz.
+      // NOT: create'de resource.data yoktur, notChanging() çalışmaz.
+      // Sayaçların sıfır ile başlatıldığı açıkça doğrulanır.
+      allow create: if isAuthenticated() && isNotBanned() &&
+        request.resource.data.status == 'draft' &&
+        request.resource.data.authorUid == request.auth.uid &&
+        request.resource.data.likeCount == 0 &&
+        request.resource.data.dislikeCount == 0 &&
+        request.resource.data.commentCount == 0 &&
+        request.resource.data.averageRating == 0.0 &&
+        request.resource.data.ratingCount == 0;
+
+      // Güncelleme: sahip düzenleyebilir (ama sadece izin verilen alanlar)
+      allow update: if isAuthenticated() && isNotBanned() && (
+        // Gönderi sahibi sadece taslak veya düzenleme_bekleniyor durumunda düzenleyebilir
+        (isOwner(resource.data.authorUid) &&
+          resource.data.status in ['draft', 'edit_requested'] &&
+          notChanging(['status', 'authorUid', 'likeCount', 'dislikeCount',
+                       'commentCount', 'averageRating', 'ratingCount', 'createdAt'])) ||
+        // Moderatör/admin durum güncelleyebilir
+        isModerator()
+      );
+
+      // Silme: yalnızca admin veya Cloud Functions
+      allow delete: if isAdmin();
+
+      // Alt koleksiyon: yorumlar (post içinde değil, ana koleksiyonda)
+      // Bak: comments koleksiyonu
+
+      // Alt koleksiyon: kullanıcı reaksiyonları (beğeni/eksi oy)
+      // Kullanıcı yalnızca kendi reaksiyon belgesini okuyabilir.
+      // Yazma: yalnızca togglePostReaction Cloud Function (Admin SDK rules'u atlar).
+      match /reactions/{uid} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+    }
+
+    // ─── comments (alt koleksiyon: /posts/{postId}/comments/{commentId}) ──────
+    // CLAUDE.md §9: Yorumlar posts alt koleksiyonu olarak saklanır.
+    // Yazma işlemleri addComment/deleteComment CF üzerinden yapılır.
+    match /posts/{postId}/comments/{commentId} {
+
+      // Giriş yapmış herkes görebilir (gizli yorumlar CF kontrolüyle filtrelenir)
+      allow read: if isAuthenticated();
+
+      // Doğrudan istemci yazması yasak — tüm yazma CF üzerinden
+      allow write: if false;
+    }
+
+    // ─── postReactions ───────────────────────────────────────────────────────
+    match /postReactions/{reactionId} {
+      // reactionId = "{postId}_{userId}"
+      allow read: if isAuthenticated();
+
+      // Sayaçlar Cloud Functions üzerinden değiştirilir
+      // İstemci doğrudan tepki belgesine yazamaz — güvenlik için CF kullanılır
+      allow write: if false; // toggleReaction Cloud Function üzerinden
+    }
+
+    // ─── postRatings ─────────────────────────────────────────────────────────
+    match /postRatings/{ratingId} {
+      // ratingId = "{postId}_{userId}"
+      allow read: if isAuthenticated();
+      allow write: if false; // ratePost Cloud Function üzerinden
+    }
+
+    // ─── commentReactions ────────────────────────────────────────────────────
+    match /commentReactions/{reactionId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Cloud Function üzerinden
+    }
+
+    // ─── reports ─────────────────────────────────────────────────────────────
+    // CLAUDE.md §11: Şikayetler yalnızca createReport Cloud Function üzerinden oluşturulur.
+    // Böylece mükerrer şikayet kontrolü her zaman CF tarafında yapılır.
+    match /reports/{reportId} {
+      // Raporlar yalnızca moderatörler/adminler veya raporun sahibi tarafından okunur
+      allow read: if isModerator() ||
+        (isAuthenticated() && resource.data.reporterUid == request.auth.uid);
+
+      // Oluşturma: yalnızca Cloud Functions (Admin SDK rules'u atlar, bu kural client için)
+      allow create: if false;
+
+      // Güncelleme/Silme: yalnızca moderatörler
+      allow update: if isModerator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── references ──────────────────────────────────────────────────────────
+    match /references/{referenceId} {
+      // Onaylı referanslar geniş kitlelere açık; bekleyenler sadece taraflara
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'approved' ||
+        isModerator() ||
+        request.auth.uid in [resource.data.fromUid, resource.data.toUid]
+      );
+
+      // Oluşturma: yalnızca Cloud Functions initiateReference üzerinden
+      allow create: if false;
+
+      // Güncelleme: yalnızca Cloud Functions üzerinden
+      allow update: if false;
+
+      // Silme: yalnızca admin
+      allow delete: if isAdmin();
+    }
+
+    // ─── referenceResponses ──────────────────────────────────────────────────
+    match /referenceResponses/{responseId} {
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'approved' ||
+        isModerator() ||
+        request.auth.uid in [resource.data.fromUid, resource.data.respondentUid]
+      );
+      allow write: if false; // Yalnızca Cloud Functions
+    }
+
+    // ─── referenceAppeals ────────────────────────────────────────────────────
+    match /referenceAppeals/{appealId} {
+      allow read: if isModerator() ||
+        (isAuthenticated() && request.auth.uid == resource.data.appellantUid);
+      allow write: if false; // Yalnızca Cloud Functions
+    }
+
+    // ─── contracts ───────────────────────────────────────────────────────────
+    // CLAUDE.md: Sözleşmeler yalnızca taraflar ve yetkili yöneticiler tarafından okunabilir.
+    match /contracts/{contractId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid in resource.data.partyUids ||
+        isAdmin()
+      );
+      allow write: if false; // Yalnızca Cloud Functions
+    }
+
+    // ─── contracts/{contractId}/versions ─────────────────────────────────────
+    // CF createContract → versions/v1, lockContractVersion → versions/v{n}
+    // Alt koleksiyon olarak saklanır (ayrı üst koleksiyon değil).
+    match /contracts/{contractId}/versions/{versionId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid in get(/databases/$(database)/documents/contracts/$(contractId)).data.partyUids ||
+        isAdmin()
+      );
+      allow write: if false; // Yalnızca Cloud Functions
+    }
+
+    // ─── contractTemplates ───────────────────────────────────────────────────
+    match /contractTemplates/{templateId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin(); // Admin yönetim panelinden yönetir
+    }
+
+    // ─── categories ──────────────────────────────────────────────────────────
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ─── bannedTerms ─────────────────────────────────────────────────────────
+    match /bannedTerms/{termId} {
+      // Yasaklı kelimeler istemciye açık olmamalıdır
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ─── adSettings ──────────────────────────────────────────────────────────
+    match /adSettings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ─── appSettings ─────────────────────────────────────────────────────────
+    match /appSettings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ─── moderationQueue ─────────────────────────────────────────────────────
+    match /moderationQueue/{itemId} {
+      allow read: if isModerator();
+      allow write: if false; // Yalnızca Cloud Functions
+    }
+
+    // ─── moderationActions ───────────────────────────────────────────────────
+    match /moderationActions/{actionId} {
+      allow read: if isModerator();
+      allow write: if false; // Yalnızca Cloud Functions
+    }
+
+    // ─── auditLogs ───────────────────────────────────────────────────────────
+    // CLAUDE.md: Denetim kayıtları sıradan kullanıcılar tarafından okunamamalıdır.
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Yalnızca Cloud Functions createAuditLog
+    }
+
+    // ─── blockedUsers ────────────────────────────────────────────────────────
+    match /blockedUsers/{blockId} {
+      // blockId = "{blockerUid}_{blockedUid}"
+      allow read: if isAuthenticated() &&
+        request.auth.uid == resource.data.blockerUid;
+      allow write: if false; // blockUser/unblockUser Cloud Functions
+    }
+
+    // ─── purchases ───────────────────────────────────────────────────────────
+    // CLAUDE.md §18: Satın alma hakları istemciden değiştirilemez.
+    // Yalnızca validatePurchaseToken Cloud Function yazabilir.
+    // Kullanıcı yalnızca kendi satın alma kaydını okuyabilir.
+    match /purchases/{uid} {
+      // Kullanıcı yalnızca kendi satın alma durumunu okuyabilir
+      allow read: if isOwner(uid);
+
+      // İstemci tarafından kesinlikle yazılamaz — yalnızca Cloud Functions
+      allow write: if false;
+    }
+
+    // ─── dataExportRequests ──────────────────────────────────────────────────
+    // CLAUDE.md §20: Kullanıcının veri indirme talebi oluşturabilmesini sağla.
+    // Kullanıcı kendi talebini oluşturabilir ve okuyabilir; Cloud Functions işler.
+    match /dataExportRequests/{requestId} {
+      allow read: if isAuthenticated() &&
+        resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      allow update: if false; // Yalnızca Cloud Functions durumu günceller
+      allow delete: if false;
+    }
+
+    // ─── adminTasks ──────────────────────────────────────────────────────────
+    // Yönetim paneli veya Cloud Functions tarafından kullanılan görev kuyruğu.
+    match /adminTasks/{taskId} {
+      allow read:  if isAdmin();
+      allow write: if false; // Yalnızca Cloud Functions Admin SDK
+    }
+
+    // ─── referenceRelations ──────────────────────────────────────────────────
+    // Referans ilişki kayıtları — CF tarafından yönetilir.
+    match /referenceRelations/{relationId} {
+      allow read: if isAuthenticated() &&
+        (request.auth.uid in [resource.data.fromUid, resource.data.toUid] ||
+         isModerator());
+      allow write: if false; // Yalnızca Cloud Functions
+    }
+
+    // ─── scheduledCleanup (system koleksiyonu) ────────────────────────────────
+    // Zamanlanmış temizlik kayıtları — yalnızca sistem işlemleri.
+    match /scheduledCleanup/{docId} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
+  }
+}

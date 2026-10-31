@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://admin.example.com", 
+      "https://dev.example.com", 
+      "https://app.example.com", 
+      "http://localhost:3000"
+    ],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+    "maxAgeSeconds": 3600
+  }
+]

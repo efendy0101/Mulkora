@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mülkora</string>
+    <string name="app_description">Kiracı ve ev sahibinin ortak zemini</string>
+
+    <!-- Notification channels -->
+    <string name="notification_channel_general">Genel Bildirimler</string>
+    <string name="notification_channel_reference">Referans Bildirimleri</string>
+    <string name="notification_channel_moderation">Moderasyon Bildirimleri</string>
+    <string name="notification_channel_comments">Yorum Bildirimleri</string>
+    <string name="notification_channel_contracts">Sözleşme Bildirimleri</string>
+</resources>

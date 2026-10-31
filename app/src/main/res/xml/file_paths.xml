@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider yolları: görsel seçme ve paylaşma işlemleri için.
+    CLAUDE.md §15: Görsel yükleme — güvenli dosya adı ve EXIF temizleme gerektirir.
+-->
+<paths>
+    <!-- Kamera ile çekilen geçici görseller -->
+    <cache-path name="camera_images" path="camera/" />
+    <!-- Sözleşme PDF dosyaları (geçici dışa aktarma) -->
+    <cache-path name="contract_pdfs" path="contracts/" />
+    <!-- Dışa aktarma talepleri -->
+    <cache-path name="exports" path="exports/" />
+</paths>
